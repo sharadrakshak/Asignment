@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 const Game = () => {
   const [config, setConfig] = useState(null);
   const [found, setFound] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(150);
+  const [timeLeft, setTimeLeft] = useState(15);
   const [gameActive, setGameActive] = useState(true);
 
   useEffect(() => {
