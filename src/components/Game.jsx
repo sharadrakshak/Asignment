@@ -1,38 +1,37 @@
-import { useEffect, useState } from 'react';
-// import './styles/Game.css';
+import { useEffect, useState, useRef } from 'react';
+import '../styles/Game.css';
 
-const Game = () => {
-  const [config, setConfig] = useState(null);
+
+const Game = ({ config }) => {
   const [found, setFound] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(15);
+  const [timeLeft, setTimeLeft] = useState(config.timeLimit);
   const [gameActive, setGameActive] = useState(true);
+  const leftImgRef = useRef(null);
+  const rightImgRef = useRef(null);
+  const timerRef = useRef(null); // Add ref for the timer
 
-  useEffect(() => {
-    fetch('/config.json')
-      .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
-        return response.json();
-      })
-      .then(data => setConfig(data))
-      .catch(error => console.error('Error loading config:', error));
-  }, []);
-
-  useEffect(() => {
+  // Timer countdown
+ useEffect(() => {
     if (!config) return;
 
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prevTime => {
+        if (prevTime <= 1) {
+          clearInterval(timerRef.current);
           handleGameEnd(false);
           return 0;
         }
-        return prev - 1;
+        return prevTime - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [config]);
+    // Cleanup function
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [config]); 
 
   const handleGameEnd = (won) => {
     setGameActive(false);
@@ -42,61 +41,59 @@ const Game = () => {
     setTimeout(() => {
       alert(won ? 'You Win! 🎉' : '⏱ Time\'s up! You lost.');
       window.location.reload();
-    }, won ? 200 : 2000);
+    }, won ? 500 : 2000);
   };
 
   const handleClick = (e, side) => {
-    if (!gameActive || !config) return;
+    if (!gameActive) return;
 
-    const imgElement = e.target;
-    const rect = imgElement.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    const imgRef = side === 'left' ? leftImgRef : rightImgRef;
+    const img = imgRef.current;
+    const rect = img.getBoundingClientRect();
+    
+    // Calculate click position relative to original image size
+    const scaleX = img.naturalWidth / img.clientWidth;
+    console.log(img.naturalWidth)
+    const scaleY = img.naturalHeight / img.clientHeight;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
 
-    const updatedRects = [...config.diffRects];
+    // Check against differences
     let matched = false;
-
-    updatedRects.forEach(diff => {
-      if (
-        diff.side === side &&
-        !diff.found &&
-        clickX >= diff.x &&
-        clickX <= diff.x + diff.width &&
-        clickY >= diff.y &&
-        clickY <= diff.y + diff.height
-      ) {
+    config.diffRects.forEach(diff => {
+      if (diff.side === side &&
+          !diff.found &&
+          clickX >= diff.x && clickX <= diff.x + diff.width &&
+          clickY >= diff.y && clickY <= diff.y + diff.height) {
+        
         diff.found = true;
         matched = true;
         setFound(prev => prev + 1);
-        highlightDifference(diff, side);
+        highlightDifference(diff, side, img);
         
-        const sound = new Audio('/sounds/click.wav');
-        sound.play();
+        new Audio('/sounds/click.wav').play();
 
         if (found + 1 === config.diffRects.length) {
           handleGameEnd(true);
         }
       }
     });
-
-    if (matched) {
-      setConfig(prev => ({ ...prev, diffRects: updatedRects }));
-    }
   };
 
-  const highlightDifference = (diff, side) => {
+  const highlightDifference = (diff, side, img) => {
+    const scaleX = img.clientWidth / img.naturalWidth;
+    const scaleY = img.clientHeight / img.naturalHeight;
+    
     const highlight = document.createElement('div');
     highlight.className = 'highlight';
-    highlight.style.left = `${diff.x}px`;
-    highlight.style.top = `${diff.y}px`;
-    highlight.style.width = `${diff.width}px`;
-    highlight.style.height = `${diff.height}px`;
+    highlight.style.left = `${diff.x * scaleX}px`;
+    highlight.style.top = `${diff.y * scaleY}px`;
+    highlight.style.width = `${diff.width * scaleX}px`;
+    highlight.style.height = `${diff.height * scaleY}px`;
 
-    const overlay = document.getElementById(`overlay-${side}`);
-    overlay.appendChild(highlight);
+    document.getElementById(`overlay-${side}`).appendChild(highlight);
   };
 
-  if (!config) return <div className="loading">Loading game...</div>;
 
   return (
     <div className="game-container">
@@ -104,19 +101,19 @@ const Game = () => {
       <div className="game">
         <div className="side">
           <img
+            ref={leftImgRef}
             src={config.images.image1}
             alt="Original"
             onClick={(e) => handleClick(e, 'left')}
-            style={{ pointerEvents: gameActive ? 'auto' : 'none' }}
           />
           <div className="overlay" id="overlay-left"></div>
         </div>
         <div className="side">
           <img
+            ref={rightImgRef}
             src={config.images.image2}
             alt="Modified"
             onClick={(e) => handleClick(e, 'right')}
-            style={{ pointerEvents: gameActive ? 'auto' : 'none' }}
           />
           <div className="overlay" id="overlay-right"></div>
         </div>

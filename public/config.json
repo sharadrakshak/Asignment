@@ -1,5 +1,6 @@
 {
-  "gameTitle": "Spot the Difference - Animals",
+  "gameTitle": "Spot the Difference",
+  "timeLimit": 15,
   "images": {
     "image1": "/images/left.jpg",
     "image2": "/images/right.jpg"
